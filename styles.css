@@ -1,0 +1,253 @@
+:root {
+  --bg-0: #f4f7ee;
+  --bg-1: #dce8ff;
+  --bg-2: #fff3d9;
+  --ink: #122025;
+  --ink-soft: #415863;
+  --card: rgba(255, 255, 255, 0.75);
+  --stroke: rgba(18, 32, 37, 0.16);
+  --accent: #0f766e;
+  --accent-strong: #0b5f58;
+  --danger: #b42318;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: Manrope, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 10% 15%, var(--bg-1) 0%, transparent 35%),
+    radial-gradient(circle at 85% 20%, var(--bg-2) 0%, transparent 38%),
+    linear-gradient(180deg, #fafff4 0%, var(--bg-0) 100%);
+}
+
+.app-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 2rem 1rem 2.5rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.hero {
+  background: var(--card);
+  border: 1px solid var(--stroke);
+  border-radius: 22px;
+  padding: 1.2rem 1.25rem;
+  backdrop-filter: blur(6px);
+  animation: lift-in 520ms ease;
+}
+
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  font-family: "Space Grotesk", sans-serif;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+}
+
+h1 {
+  margin: 0.4rem 0;
+  font-size: clamp(1.5rem, 3.5vw, 2.5rem);
+  line-height: 1.08;
+}
+
+.subheading {
+  margin: 0;
+  color: var(--ink-soft);
+  max-width: 70ch;
+}
+
+.controls {
+  background: var(--card);
+  border: 1px solid var(--stroke);
+  border-radius: 22px;
+  padding: 0.9rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  animation: lift-in 620ms ease;
+}
+
+.file-label,
+.btn {
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  padding: 0.56rem 0.9rem;
+  font-weight: 700;
+  background: #fff;
+}
+
+.file-label {
+  cursor: pointer;
+}
+
+#pdfInput {
+  max-width: 240px;
+}
+
+.btn {
+  cursor: pointer;
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.page-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 700;
+}
+
+.quality-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 700;
+}
+
+#qualityMode {
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  padding: 0.45rem 0.7rem;
+  font: inherit;
+  background: #fff;
+}
+
+#pageNumberInput {
+  width: 6rem;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  padding: 0.45rem 0.7rem;
+  font: inherit;
+}
+
+.page-indicator {
+  margin: 0;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.viewer-wrap {
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid var(--stroke);
+  border-radius: 24px;
+  min-height: 600px;
+  padding: 1rem;
+  display: grid;
+  place-items: center;
+  animation: lift-in 760ms ease;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.viewer-wrap.drag-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 5px rgba(15, 118, 110, 0.14);
+  background: rgba(241, 255, 251, 0.9);
+}
+
+.drop-hint {
+  margin: 0 0 0.5rem;
+  color: var(--ink-soft);
+  font-weight: 700;
+  text-align: center;
+}
+
+.status {
+  font-weight: 700;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.status.error {
+  color: var(--danger);
+}
+
+.flipbook-container {
+  width: min(100%, 1050px);
+  display: grid;
+  place-items: center;
+}
+
+#flipbook {
+  width: min(100%, 1000px);
+  height: min(72vh, 760px);
+}
+
+.page {
+  overflow: hidden;
+  background: #fff;
+  border-radius: 4px;
+}
+
+.page img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background: #fff;
+}
+
+.notes {
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .viewer-wrap {
+    min-height: 420px;
+  }
+
+  #flipbook {
+    width: min(100%, 680px);
+    height: min(62vh, 560px);
+  }
+}
+
+@media (max-width: 640px) {
+  .controls {
+    gap: 0.5rem;
+  }
+
+  #pdfInput {
+    max-width: 100%;
+  }
+
+  #flipbook {
+    width: min(100%, 420px);
+    height: min(62vh, 520px);
+  }
+}
+
+@keyframes lift-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

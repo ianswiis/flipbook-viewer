@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flipbook Creator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/css/page-flip.css"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <p class="eyebrow">GitHub Pages Ready</p>
+        <h1>PDF to Flipbook Creator</h1>
+        <p class="subheading">
+          Upload a PDF and instantly preview it as an animated flipbook directly in your browser.
+          Your file never leaves your device.
+        </p>
+      </header>
+
+      <section class="controls" aria-label="Flipbook controls">
+        <label class="file-label" for="pdfInput">Choose PDF</label>
+        <input id="pdfInput" type="file" accept="application/pdf,.pdf" />
+
+        <label class="quality-mode" for="qualityMode">
+          Quality
+          <select id="qualityMode">
+            <option value="fast">Fast</option>
+            <option value="balanced" selected>Balanced</option>
+            <option value="high">High</option>
+          </select>
+        </label>
+
+        <button id="prevBtn" class="btn" disabled>Previous</button>
+        <button id="nextBtn" class="btn" disabled>Next</button>
+
+        <label class="page-jump" for="pageNumberInput">
+          Page
+          <input id="pageNumberInput" type="number" min="1" value="1" disabled />
+        </label>
+        <button id="goToPageBtn" class="btn" disabled>Go</button>
+
+        <p id="pageIndicator" class="page-indicator" aria-live="polite">No document loaded</p>
+      </section>
+
+      <section class="viewer-wrap" aria-label="Flipbook viewer">
+        <p id="dropHint" class="drop-hint">Drag and drop a PDF anywhere in this viewer.</p>
+        <div id="status" class="status" aria-live="polite">
+          Upload a PDF to generate your flipbook.
+        </div>
+        <div id="flipbookContainer" class="flipbook-container" hidden>
+          <div id="flipbook"></div>
+        </div>
+      </section>
+
+      <footer class="notes">
+        <p>
+          Tip: For best performance on mobile, use PDFs under 100 pages or lower DPI scans.
+        </p>
+      </footer>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
