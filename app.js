@@ -22,7 +22,7 @@ const shareLinkOutput = document.getElementById("shareLinkOutput");
 
 // Configure these endpoints after creating API endpoints in Xano.
 const XANO_CONFIG = {
-  apiBaseUrl: "",
+  apiBaseUrl: "https://x8ki-letl-twmt.n7.xano.io/api:gqsFr-bP",
   uploadPdfPath: "/flipbooks/upload",
   createSharePath: "/flipbooks/share",
   resolveSharePath: "/flipbooks/share",
