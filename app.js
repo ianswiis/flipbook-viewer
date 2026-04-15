@@ -22,6 +22,7 @@ let currentPage = 1;
 let pageCount = 0;
 let currentObjectUrls = [];
 let bookDimensions = { width: 900, height: 1200 };
+const BLANK_FRONT_PAGE_COUNT = 1;
 
 const DEFAULT_PAGE_WIDTH = 900;
 const DEFAULT_PAGE_HEIGHT = 1200;
@@ -53,9 +54,24 @@ function updateIndicator() {
     return;
   }
 
-  pageIndicator.textContent = `Page ${currentPage} of ${pageCount}`;
-  pageNumberInput.value = String(currentPage);
+  if (currentPage <= BLANK_FRONT_PAGE_COUNT) {
+    pageIndicator.textContent = `Blank intro page | PDF page 1 of ${pageCount}`;
+    pageNumberInput.value = "1";
+    pageNumberInput.max = String(pageCount);
+    return;
+  }
+
+  const pdfPage = Math.min(pageCount, currentPage - BLANK_FRONT_PAGE_COUNT);
+  pageIndicator.textContent = `PDF page ${pdfPage} of ${pageCount}`;
+  pageNumberInput.value = String(pdfPage);
   pageNumberInput.max = String(pageCount);
+}
+
+function buildBlankFrontPageNode() {
+  const pageNode = document.createElement("div");
+  pageNode.className = "page blank-front-page";
+  pageNode.setAttribute("aria-label", "Blank intro page");
+  return pageNode;
 }
 
 function resetFlipbook() {
@@ -134,7 +150,7 @@ function initializeFlipbook() {
     maxWidth: 1280,
     minHeight: 260,
     maxHeight: 1600,
-    showCover: true,
+    showCover: false,
     mobileScrollSupport: true,
     flippingTime: 680,
     usePortrait: true,
@@ -190,6 +206,12 @@ async function buildFlipbookFromPdf(file) {
   }
 
   for (let i = 1; i <= pageCount; i += 1) {
+    if (i === 1 && BLANK_FRONT_PAGE_COUNT > 0) {
+      for (let j = 0; j < BLANK_FRONT_PAGE_COUNT; j += 1) {
+        flipbookEl.appendChild(buildBlankFrontPageNode());
+      }
+    }
+
     const page = await pdf.getPage(i);
     const imageUrl = await renderPageAsImage(page, qualityPreset.scale, qualityPreset.imageQuality);
     currentObjectUrls.push(imageUrl);
@@ -308,7 +330,7 @@ goToPageBtn.addEventListener("click", () => {
   }
 
   const clamped = Math.min(Math.max(targetPage, 1), pageCount);
-  pageFlip.flip(clamped - 1);
+  pageFlip.flip(clamped - 1 + BLANK_FRONT_PAGE_COUNT);
 });
 
 setControlsEnabled(false);
