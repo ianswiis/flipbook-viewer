@@ -23,9 +23,8 @@ const shareLinkOutput = document.getElementById("shareLinkOutput");
 // Configure these endpoints after creating API endpoints in Xano.
 const XANO_CONFIG = {
   apiBaseUrl: "https://x8ki-letl-twmt.n7.xano.io/api:gqsFr-bP",
-  uploadPdfPath: "/flipbooks/upload",
-  createSharePath: "/flipbooks/share",
-  resolveSharePath: "/flipbooks/share",
+  createRecordPath: "/flipbook",
+  getRecordPath: "/flipbook",
   apiKey: "",
 };
 
@@ -69,7 +68,17 @@ function buildApiHeaders(extraHeaders = {}) {
 }
 
 function extractFileUrl(payload) {
-  return payload.file_url || payload.fileUrl || payload.url || payload.pdf_url || payload.pdfUrl || "";
+  const candidate = payload.file_url || payload.fileUrl || payload.url || payload.pdf_url || payload.pdfUrl;
+
+  if (typeof candidate === "string") {
+    return candidate;
+  }
+
+  if (candidate && typeof candidate === "object") {
+    return candidate.url || candidate.path || "";
+  }
+
+  return "";
 }
 
 function extractShareToken(payload) {
@@ -78,6 +87,21 @@ function extractShareToken(payload) {
 
 function extractShareUrl(payload) {
   return payload.share_url || payload.shareUrl || "";
+}
+
+function extractRecordId(payload) {
+  return payload.id || payload.flipbook_id || payload.flipbookId || "";
+}
+
+function toDataUrl(pdfBytes) {
+  const bytes = new Uint8Array(pdfBytes);
+  let binary = "";
+
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+
+  return `data:application/pdf;base64,${btoa(binary)}`;
 }
 
 function updateShareControls() {
@@ -158,44 +182,36 @@ function resetFlipbook() {
   updateIndicator();
 }
 
-async function uploadPdfToXano(pdfBytes, filename) {
+async function createShareRecordInXano(pdfBytes, name, pages) {
   const fileBlob = new Blob([pdfBytes], { type: "application/pdf" });
-  const formData = new FormData();
-  formData.append("file", fileBlob, filename || "document.pdf");
+  const multipart = new FormData();
+  multipart.append("file_url", fileBlob, name || "document.pdf");
+  multipart.append("filename", name || "document.pdf");
+  multipart.append("page_count", String(pages));
+  multipart.append("token", crypto.randomUUID());
 
-  const response = await fetch(buildApiUrl(XANO_CONFIG.uploadPdfPath), {
+  let response = await fetch(buildApiUrl(XANO_CONFIG.createRecordPath), {
     method: "POST",
-    body: formData,
+    body: multipart,
     headers: buildApiHeaders(),
   });
 
+  // Fallback for tables where file_url is plain text: store a data URL.
   if (!response.ok) {
-    throw new Error(`Upload failed with status ${response.status}.`);
+    response = await fetch(buildApiUrl(XANO_CONFIG.createRecordPath), {
+      method: "POST",
+      headers: buildApiHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        filename: name || "document.pdf",
+        page_count: pages,
+        token: crypto.randomUUID(),
+        file_url: toDataUrl(pdfBytes),
+      }),
+    });
   }
 
-  const payload = await response.json();
-  const fileUrl = extractFileUrl(payload);
-  if (!fileUrl) {
-    throw new Error("Upload endpoint did not return a file URL.");
-  }
-
-  return fileUrl;
-}
-
-async function createShareRecordInXano(fileUrl, name, pages) {
-  const response = await fetch(buildApiUrl(XANO_CONFIG.createSharePath), {
-    method: "POST",
-    headers: buildApiHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      file_url: fileUrl,
-      filename: name,
-      page_count: pages,
-      created_at: new Date().toISOString(),
-    }),
-  });
-
   if (!response.ok) {
-    throw new Error(`Share create failed with status ${response.status}.`);
+    throw new Error(`Create record failed with status ${response.status}.`);
   }
 
   const payload = await response.json();
@@ -204,24 +220,24 @@ async function createShareRecordInXano(fileUrl, name, pages) {
     return shareUrl;
   }
 
-  const token = extractShareToken(payload);
-  if (!token) {
-    throw new Error("Share endpoint did not return a token or share URL.");
+  const recordId = extractRecordId(payload);
+  if (!recordId) {
+    throw new Error("Create endpoint did not return a record id.");
   }
 
   const url = new URL(window.location.href);
-  url.searchParams.set("book", token);
+  url.searchParams.set("book", String(recordId));
   return url.toString();
 }
 
-async function resolveSharedBookFromXano(token) {
-  const response = await fetch(buildApiUrl(`${XANO_CONFIG.resolveSharePath}/${encodeURIComponent(token)}`), {
+async function resolveSharedBookFromXano(recordId) {
+  const response = await fetch(buildApiUrl(`${XANO_CONFIG.getRecordPath}/${encodeURIComponent(recordId)}`), {
     method: "GET",
     headers: buildApiHeaders(),
   });
 
   if (!response.ok) {
-    throw new Error(`Share resolve failed with status ${response.status}.`);
+    throw new Error(`Record fetch failed with status ${response.status}.`);
   }
 
   const payload = await response.json();
@@ -450,14 +466,13 @@ saveShareBtn.addEventListener("click", async () => {
   try {
     saveShareBtn.disabled = true;
     setStatus("Saving PDF to backend and creating share link...");
-    const fileUrl = await uploadPdfToXano(currentPdfBytes, currentPdfName);
-    const shareUrl = await createShareRecordInXano(fileUrl, currentPdfName, pageCount);
+    const shareUrl = await createShareRecordInXano(currentPdfBytes, currentPdfName, pageCount);
     shareLinkOutput.value = shareUrl;
     copyShareBtn.disabled = false;
     setStatus("Share link created.");
   } catch (error) {
     console.error(error);
-    setStatus("Could not create share link. Check Xano endpoint config and CORS.", true);
+    setStatus("Could not create share link. Check Xano table inputs and CORS.", true);
   } finally {
     updateShareControls();
   }
@@ -479,8 +494,8 @@ copyShareBtn.addEventListener("click", async () => {
 
 async function loadSharedBookFromUrlIfPresent() {
   const params = new URLSearchParams(window.location.search);
-  const token = params.get("book");
-  if (!token) {
+  const recordId = params.get("book");
+  if (!recordId) {
     return;
   }
 
@@ -492,7 +507,7 @@ async function loadSharedBookFromUrlIfPresent() {
   try {
     dropHint.hidden = true;
     setStatus("Loading shared document...");
-    const { fileUrl, filename } = await resolveSharedBookFromXano(token);
+    const { fileUrl, filename } = await resolveSharedBookFromXano(recordId);
     const pdfBytes = await fetchPdfBytesFromUrl(fileUrl);
     await buildFlipbookFromPdfBytes(pdfBytes, filename);
     setStatus("Shared flipbook loaded.");
