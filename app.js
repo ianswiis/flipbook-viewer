@@ -16,12 +16,26 @@ const nextBtn = document.getElementById("nextBtn");
 const goToPageBtn = document.getElementById("goToPageBtn");
 const pageNumberInput = document.getElementById("pageNumberInput");
 const pageIndicator = document.getElementById("pageIndicator");
+const saveShareBtn = document.getElementById("saveShareBtn");
+const copyShareBtn = document.getElementById("copyShareBtn");
+const shareLinkOutput = document.getElementById("shareLinkOutput");
+
+// Configure these endpoints after creating API endpoints in Xano.
+const XANO_CONFIG = {
+  apiBaseUrl: "",
+  uploadPdfPath: "/flipbooks/upload",
+  createSharePath: "/flipbooks/share",
+  resolveSharePath: "/flipbooks/share",
+  apiKey: "",
+};
 
 let pageFlip = null;
 let currentPage = 1;
 let pageCount = 0;
 let currentObjectUrls = [];
 let bookDimensions = { width: 900, height: 1200 };
+let currentPdfBytes = null;
+let currentPdfName = "";
 const BLANK_FRONT_PAGE_COUNT = 1;
 const BLANK_BACK_PAGE_COUNT = 1;
 
@@ -34,6 +48,43 @@ const QUALITY_PRESETS = {
 };
 
 let dragDepth = 0;
+
+function isXanoConfigured() {
+  return Boolean(XANO_CONFIG.apiBaseUrl.trim());
+}
+
+function buildApiUrl(path) {
+  const base = XANO_CONFIG.apiBaseUrl.replace(/\/$/, "");
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${cleanPath}`;
+}
+
+function buildApiHeaders(extraHeaders = {}) {
+  const headers = { ...extraHeaders };
+  const apiKey = XANO_CONFIG.apiKey.trim();
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+  return headers;
+}
+
+function extractFileUrl(payload) {
+  return payload.file_url || payload.fileUrl || payload.url || payload.pdf_url || payload.pdfUrl || "";
+}
+
+function extractShareToken(payload) {
+  return payload.share_token || payload.shareToken || payload.token || payload.id || "";
+}
+
+function extractShareUrl(payload) {
+  return payload.share_url || payload.shareUrl || "";
+}
+
+function updateShareControls() {
+  const canShare = isXanoConfigured() && currentPdfBytes;
+  saveShareBtn.disabled = !canShare;
+  copyShareBtn.disabled = !shareLinkOutput.value;
+}
 
 function setStatus(text, isError = false) {
   statusEl.textContent = text;
@@ -62,7 +113,6 @@ function updateIndicator() {
     return;
   }
 
-  const totalPages = BLANK_FRONT_PAGE_COUNT + pageCount + BLANK_BACK_PAGE_COUNT;
   if (currentPage > BLANK_FRONT_PAGE_COUNT + pageCount) {
     pageIndicator.textContent = `PDF page ${pageCount} of ${pageCount}`;
     pageNumberInput.value = String(pageCount);
@@ -102,8 +152,97 @@ function resetFlipbook() {
   flipbookEl.innerHTML = "";
   currentPage = 1;
   pageCount = 0;
+  shareLinkOutput.value = "";
   setControlsEnabled(false);
+  updateShareControls();
   updateIndicator();
+}
+
+async function uploadPdfToXano(pdfBytes, filename) {
+  const fileBlob = new Blob([pdfBytes], { type: "application/pdf" });
+  const formData = new FormData();
+  formData.append("file", fileBlob, filename || "document.pdf");
+
+  const response = await fetch(buildApiUrl(XANO_CONFIG.uploadPdfPath), {
+    method: "POST",
+    body: formData,
+    headers: buildApiHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Upload failed with status ${response.status}.`);
+  }
+
+  const payload = await response.json();
+  const fileUrl = extractFileUrl(payload);
+  if (!fileUrl) {
+    throw new Error("Upload endpoint did not return a file URL.");
+  }
+
+  return fileUrl;
+}
+
+async function createShareRecordInXano(fileUrl, name, pages) {
+  const response = await fetch(buildApiUrl(XANO_CONFIG.createSharePath), {
+    method: "POST",
+    headers: buildApiHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({
+      file_url: fileUrl,
+      filename: name,
+      page_count: pages,
+      created_at: new Date().toISOString(),
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Share create failed with status ${response.status}.`);
+  }
+
+  const payload = await response.json();
+  const shareUrl = extractShareUrl(payload);
+  if (shareUrl) {
+    return shareUrl;
+  }
+
+  const token = extractShareToken(payload);
+  if (!token) {
+    throw new Error("Share endpoint did not return a token or share URL.");
+  }
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("book", token);
+  return url.toString();
+}
+
+async function resolveSharedBookFromXano(token) {
+  const response = await fetch(buildApiUrl(`${XANO_CONFIG.resolveSharePath}/${encodeURIComponent(token)}`), {
+    method: "GET",
+    headers: buildApiHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Share resolve failed with status ${response.status}.`);
+  }
+
+  const payload = await response.json();
+  const fileUrl = extractFileUrl(payload);
+  if (!fileUrl) {
+    throw new Error("Resolve endpoint did not return a file URL.");
+  }
+
+  return {
+    fileUrl,
+    filename: payload.filename || payload.name || "shared-document.pdf",
+  };
+}
+
+async function fetchPdfBytesFromUrl(fileUrl) {
+  const response = await fetch(fileUrl, { method: "GET" });
+  if (!response.ok) {
+    throw new Error(`Could not load shared PDF (status ${response.status}).`);
+  }
+
+  return response.arrayBuffer();
 }
 
 function toBlob(canvas, imageQuality) {
@@ -186,13 +325,12 @@ function initializeFlipbook() {
   setControlsEnabled(true);
 }
 
-async function buildFlipbookFromPdf(file) {
+async function buildFlipbookFromPdfBytes(pdfBytes, sourceName) {
   resetFlipbook();
   setStatus("Reading PDF...");
   const qualityPreset = getSelectedQualityPreset();
 
-  const fileData = await file.arrayBuffer();
-  const loadingTask = pdfjsLib.getDocument({ data: fileData });
+  const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
   const pdf = await loadingTask.promise;
 
   pageCount = pdf.numPages;
@@ -262,6 +400,10 @@ async function buildFlipbookFromPdf(file) {
     },
     { once: true }
   );
+
+  currentPdfBytes = pdfBytes.slice(0);
+  currentPdfName = sourceName || "document.pdf";
+  updateShareControls();
 }
 
 async function handlePdfFile(file) {
@@ -279,7 +421,8 @@ async function handlePdfFile(file) {
     statusEl.hidden = false;
     flipbookContainer.hidden = true;
     dropHint.hidden = true;
-    await buildFlipbookFromPdf(file);
+    const fileBytes = await file.arrayBuffer();
+    await buildFlipbookFromPdfBytes(fileBytes, file.name);
   } catch (error) {
     console.error(error);
     setStatus("Failed to parse this PDF. Try a different file.", true);
@@ -292,6 +435,72 @@ pdfInput.addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
   await handlePdfFile(file);
 });
+
+saveShareBtn.addEventListener("click", async () => {
+  if (!isXanoConfigured()) {
+    setStatus("Xano is not configured yet. Add API URLs in app.js.", true);
+    return;
+  }
+
+  if (!currentPdfBytes) {
+    setStatus("Load a PDF before creating a share link.", true);
+    return;
+  }
+
+  try {
+    saveShareBtn.disabled = true;
+    setStatus("Saving PDF to backend and creating share link...");
+    const fileUrl = await uploadPdfToXano(currentPdfBytes, currentPdfName);
+    const shareUrl = await createShareRecordInXano(fileUrl, currentPdfName, pageCount);
+    shareLinkOutput.value = shareUrl;
+    copyShareBtn.disabled = false;
+    setStatus("Share link created.");
+  } catch (error) {
+    console.error(error);
+    setStatus("Could not create share link. Check Xano endpoint config and CORS.", true);
+  } finally {
+    updateShareControls();
+  }
+});
+
+copyShareBtn.addEventListener("click", async () => {
+  if (!shareLinkOutput.value) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(shareLinkOutput.value);
+    setStatus("Share link copied.");
+  } catch (error) {
+    console.error(error);
+    setStatus("Could not copy automatically. Copy from the text field.", true);
+  }
+});
+
+async function loadSharedBookFromUrlIfPresent() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get("book");
+  if (!token) {
+    return;
+  }
+
+  if (!isXanoConfigured()) {
+    setStatus("Shared link detected, but Xano is not configured in app.js.", true);
+    return;
+  }
+
+  try {
+    dropHint.hidden = true;
+    setStatus("Loading shared document...");
+    const { fileUrl, filename } = await resolveSharedBookFromXano(token);
+    const pdfBytes = await fetchPdfBytesFromUrl(fileUrl);
+    await buildFlipbookFromPdfBytes(pdfBytes, filename);
+    setStatus("Shared flipbook loaded.");
+  } catch (error) {
+    console.error(error);
+    setStatus("Could not load this shared link.", true);
+  }
+}
 
 viewerWrap.addEventListener("dragenter", (event) => {
   event.preventDefault();
@@ -357,3 +566,5 @@ goToPageBtn.addEventListener("click", () => {
 
 setControlsEnabled(false);
 updateIndicator();
+updateShareControls();
+loadSharedBookFromUrlIfPresent();

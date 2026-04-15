@@ -80,6 +80,28 @@ h1 {
   animation: lift-in 620ms ease;
 }
 
+.share-controls {
+  background: var(--card);
+  border: 1px solid var(--stroke);
+  border-radius: 22px;
+  padding: 0.9rem;
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
+  animation: lift-in 700ms ease;
+}
+
+#shareLinkOutput {
+  width: 100%;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  padding: 0.55rem 0.85rem;
+  font: inherit;
+  background: #fff;
+  color: var(--ink-soft);
+}
+
 .file-label,
 .btn {
   border: 1px solid var(--stroke);
@@ -234,6 +256,10 @@ h1 {
 @media (max-width: 640px) {
   .controls {
     gap: 0.5rem;
+  }
+
+  .share-controls {
+    grid-template-columns: 1fr;
   }
 
   #pdfInput {
