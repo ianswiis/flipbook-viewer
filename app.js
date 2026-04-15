@@ -93,17 +93,6 @@ function extractRecordId(payload) {
   return payload.id || payload.flipbook_id || payload.flipbookId || "";
 }
 
-function toDataUrl(pdfBytes) {
-  const bytes = new Uint8Array(pdfBytes);
-  let binary = "";
-
-  for (let i = 0; i < bytes.length; i += 1) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-
-  return `data:application/pdf;base64,${btoa(binary)}`;
-}
-
 function updateShareControls() {
   const canShare = isXanoConfigured() && currentPdfBytes;
   saveShareBtn.disabled = !canShare;
@@ -196,22 +185,10 @@ async function createShareRecordInXano(pdfBytes, name, pages) {
     headers: buildApiHeaders(),
   });
 
-  // Fallback for tables where file_url is plain text: store a data URL.
   if (!response.ok) {
-    response = await fetch(buildApiUrl(XANO_CONFIG.createRecordPath), {
-      method: "POST",
-      headers: buildApiHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        filename: name || "document.pdf",
-        page_count: pages,
-        token: crypto.randomUUID(),
-        file_url: toDataUrl(pdfBytes),
-      }),
-    });
-  }
-
-  if (!response.ok) {
-    throw new Error(`Create record failed with status ${response.status}.`);
+    throw new Error(
+      `Create record failed with status ${response.status}. Ensure Xano field file_url is File type.`
+    );
   }
 
   const payload = await response.json();
