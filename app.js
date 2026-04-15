@@ -134,7 +134,7 @@ function initializeFlipbook() {
     maxWidth: 1280,
     minHeight: 260,
     maxHeight: 1600,
-    showCover: false,
+    showCover: true,
     mobileScrollSupport: true,
     flippingTime: 680,
     usePortrait: true,
