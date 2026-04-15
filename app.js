@@ -21,9 +21,10 @@ let pageFlip = null;
 let currentPage = 1;
 let pageCount = 0;
 let currentObjectUrls = [];
+let bookDimensions = { width: 900, height: 1200 };
 
-const PAGE_WIDTH = 900;
-const PAGE_HEIGHT = 1200;
+const DEFAULT_PAGE_WIDTH = 900;
+const DEFAULT_PAGE_HEIGHT = 1200;
 const QUALITY_PRESETS = {
   fast: { scale: 0.95, imageQuality: 0.8, label: "Fast" },
   balanced: { scale: 1.25, imageQuality: 0.9, label: "Balanced" },
@@ -121,16 +122,19 @@ function buildPageNode(imageUrl, pageNum) {
 }
 
 function initializeFlipbook() {
+  const pageWidth = bookDimensions.width || DEFAULT_PAGE_WIDTH;
+  const pageHeight = bookDimensions.height || DEFAULT_PAGE_HEIGHT;
+
   pageFlip = new St.PageFlip(flipbookEl, {
-    width: PAGE_WIDTH,
-    height: PAGE_HEIGHT,
+    width: pageWidth,
+    height: pageHeight,
     maxShadowOpacity: 0.38,
     size: "stretch",
-    minWidth: 320,
+    minWidth: 260,
     maxWidth: 1280,
-    minHeight: 420,
+    minHeight: 260,
     maxHeight: 1600,
-    showCover: true,
+    showCover: false,
     mobileScrollSupport: true,
     flippingTime: 680,
     usePortrait: true,
@@ -160,6 +164,21 @@ async function buildFlipbookFromPdf(file) {
   const pdf = await loadingTask.promise;
 
   pageCount = pdf.numPages;
+  if (pageCount > 0) {
+    // Match flipbook page shape to the document to avoid portrait/landscape letterboxing.
+    const firstPage = await pdf.getPage(1);
+    const firstViewport = firstPage.getViewport({ scale: 1 });
+    const baseWidth = firstViewport.width;
+    const baseHeight = firstViewport.height;
+    const longSide = 1200;
+    const scaleToLongSide = longSide / Math.max(baseWidth, baseHeight);
+
+    bookDimensions = {
+      width: Math.max(260, Math.round(baseWidth * scaleToLongSide)),
+      height: Math.max(260, Math.round(baseHeight * scaleToLongSide)),
+    };
+  }
+
   if (pageCount > 150) {
     setStatus(
       `Large PDF detected. Rendering may take a while and can use significant memory on mobile (${qualityPreset.label} mode).`
