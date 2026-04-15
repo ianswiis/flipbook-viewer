@@ -201,7 +201,8 @@ h1 {
   border-radius: 4px;
 }
 
-.blank-front-page {
+.blank-front-page,
+.blank-back-page {
   background: #fff;
 }
 

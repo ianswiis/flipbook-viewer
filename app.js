@@ -23,6 +23,7 @@ let pageCount = 0;
 let currentObjectUrls = [];
 let bookDimensions = { width: 900, height: 1200 };
 const BLANK_FRONT_PAGE_COUNT = 1;
+const BLANK_BACK_PAGE_COUNT = 1;
 
 const DEFAULT_PAGE_WIDTH = 900;
 const DEFAULT_PAGE_HEIGHT = 1200;
@@ -61,6 +62,14 @@ function updateIndicator() {
     return;
   }
 
+  const totalPages = BLANK_FRONT_PAGE_COUNT + pageCount + BLANK_BACK_PAGE_COUNT;
+  if (currentPage > BLANK_FRONT_PAGE_COUNT + pageCount) {
+    pageIndicator.textContent = `PDF page ${pageCount} of ${pageCount}`;
+    pageNumberInput.value = String(pageCount);
+    pageNumberInput.max = String(pageCount);
+    return;
+  }
+
   const pdfPage = Math.min(pageCount, currentPage - BLANK_FRONT_PAGE_COUNT);
   pageIndicator.textContent = `PDF page ${pdfPage} of ${pageCount}`;
   pageNumberInput.value = String(pdfPage);
@@ -71,6 +80,13 @@ function buildBlankFrontPageNode() {
   const pageNode = document.createElement("div");
   pageNode.className = "page blank-front-page";
   pageNode.setAttribute("aria-label", "Blank intro page");
+  return pageNode;
+}
+
+function buildBlankBackPageNode() {
+  const pageNode = document.createElement("div");
+  pageNode.className = "page blank-back-page";
+  pageNode.setAttribute("aria-label", "Blank back page");
   return pageNode;
 }
 
@@ -218,6 +234,12 @@ async function buildFlipbookFromPdf(file) {
 
     const pageNode = buildPageNode(imageUrl, i);
     flipbookEl.appendChild(pageNode);
+
+    if (i === pageCount && BLANK_BACK_PAGE_COUNT > 0) {
+      for (let j = 0; j < BLANK_BACK_PAGE_COUNT; j += 1) {
+        flipbookEl.appendChild(buildBlankBackPageNode());
+      }
+    }
 
     if (i % 4 === 0 || i === pageCount) {
       setStatus(`Rendered ${i}/${pageCount} page${pageCount === 1 ? "" : "s"}...`);
