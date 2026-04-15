@@ -55,7 +55,7 @@ function updateIndicator() {
   }
 
   if (currentPage <= BLANK_FRONT_PAGE_COUNT) {
-    pageIndicator.textContent = `Blank intro page | PDF page 1 of ${pageCount}`;
+    pageIndicator.textContent = `PDF page 1 of ${pageCount}`;
     pageNumberInput.value = "1";
     pageNumberInput.max = String(pageCount);
     return;
