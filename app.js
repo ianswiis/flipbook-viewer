@@ -16,25 +16,12 @@ const nextBtn = document.getElementById("nextBtn");
 const goToPageBtn = document.getElementById("goToPageBtn");
 const pageNumberInput = document.getElementById("pageNumberInput");
 const pageIndicator = document.getElementById("pageIndicator");
-const saveShareBtn = document.getElementById("saveShareBtn");
-const copyShareBtn = document.getElementById("copyShareBtn");
-const shareLinkOutput = document.getElementById("shareLinkOutput");
-
-// Configure these endpoints after creating API endpoints in Xano.
-const XANO_CONFIG = {
-  apiBaseUrl: "https://x8ki-letl-twmt.n7.xano.io/api:gqsFr-bP",
-  createRecordPath: "/flipbook",
-  getRecordPath: "/flipbook",
-  apiKey: "",
-};
 
 let pageFlip = null;
 let currentPage = 1;
 let pageCount = 0;
 let currentObjectUrls = [];
 let bookDimensions = { width: 900, height: 1200 };
-let currentPdfBytes = null;
-let currentPdfName = "";
 const BLANK_FRONT_PAGE_COUNT = 1;
 const BLANK_BACK_PAGE_COUNT = 1;
 
@@ -47,57 +34,6 @@ const QUALITY_PRESETS = {
 };
 
 let dragDepth = 0;
-
-function isXanoConfigured() {
-  return Boolean(XANO_CONFIG.apiBaseUrl.trim());
-}
-
-function buildApiUrl(path) {
-  const base = XANO_CONFIG.apiBaseUrl.replace(/\/$/, "");
-  const cleanPath = path.startsWith("/") ? path : `/${path}`;
-  return `${base}${cleanPath}`;
-}
-
-function buildApiHeaders(extraHeaders = {}) {
-  const headers = { ...extraHeaders };
-  const apiKey = XANO_CONFIG.apiKey.trim();
-  if (apiKey) {
-    headers.Authorization = `Bearer ${apiKey}`;
-  }
-  return headers;
-}
-
-function extractFileUrl(payload) {
-  const candidate = payload.file_url || payload.fileUrl || payload.url || payload.pdf_url || payload.pdfUrl;
-
-  if (typeof candidate === "string") {
-    return candidate;
-  }
-
-  if (candidate && typeof candidate === "object") {
-    return candidate.url || candidate.path || "";
-  }
-
-  return "";
-}
-
-function extractShareToken(payload) {
-  return payload.share_token || payload.shareToken || payload.token || payload.id || "";
-}
-
-function extractShareUrl(payload) {
-  return payload.share_url || payload.shareUrl || "";
-}
-
-function extractRecordId(payload) {
-  return payload.id || payload.flipbook_id || payload.flipbookId || "";
-}
-
-function updateShareControls() {
-  const canShare = isXanoConfigured() && currentPdfBytes;
-  saveShareBtn.disabled = !canShare;
-  copyShareBtn.disabled = !shareLinkOutput.value;
-}
 
 function setStatus(text, isError = false) {
   statusEl.textContent = text;
@@ -126,6 +62,7 @@ function updateIndicator() {
     return;
   }
 
+  const totalPages = BLANK_FRONT_PAGE_COUNT + pageCount + BLANK_BACK_PAGE_COUNT;
   if (currentPage > BLANK_FRONT_PAGE_COUNT + pageCount) {
     pageIndicator.textContent = `PDF page ${pageCount} of ${pageCount}`;
     pageNumberInput.value = String(pageCount);
@@ -165,77 +102,8 @@ function resetFlipbook() {
   flipbookEl.innerHTML = "";
   currentPage = 1;
   pageCount = 0;
-  shareLinkOutput.value = "";
   setControlsEnabled(false);
-  updateShareControls();
   updateIndicator();
-}
-
-async function createShareRecordInXano(pdfBytes, name, pages) {
-  const fileBlob = new Blob([pdfBytes], { type: "application/pdf" });
-  const multipart = new FormData();
-  multipart.append("file_url", fileBlob, name || "document.pdf");
-  multipart.append("filename", name || "document.pdf");
-  multipart.append("page_count", String(pages));
-  multipart.append("token", crypto.randomUUID());
-
-  let response = await fetch(buildApiUrl(XANO_CONFIG.createRecordPath), {
-    method: "POST",
-    body: multipart,
-    headers: buildApiHeaders(),
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Create record failed with status ${response.status}. Ensure Xano field file_url is File type.`
-    );
-  }
-
-  const payload = await response.json();
-  const shareUrl = extractShareUrl(payload);
-  if (shareUrl) {
-    return shareUrl;
-  }
-
-  const recordId = extractRecordId(payload);
-  if (!recordId) {
-    throw new Error("Create endpoint did not return a record id.");
-  }
-
-  const url = new URL(window.location.href);
-  url.searchParams.set("book", String(recordId));
-  return url.toString();
-}
-
-async function resolveSharedBookFromXano(recordId) {
-  const response = await fetch(buildApiUrl(`${XANO_CONFIG.getRecordPath}/${encodeURIComponent(recordId)}`), {
-    method: "GET",
-    headers: buildApiHeaders(),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Record fetch failed with status ${response.status}.`);
-  }
-
-  const payload = await response.json();
-  const fileUrl = extractFileUrl(payload);
-  if (!fileUrl) {
-    throw new Error("Resolve endpoint did not return a file URL.");
-  }
-
-  return {
-    fileUrl,
-    filename: payload.filename || payload.name || "shared-document.pdf",
-  };
-}
-
-async function fetchPdfBytesFromUrl(fileUrl) {
-  const response = await fetch(fileUrl, { method: "GET" });
-  if (!response.ok) {
-    throw new Error(`Could not load shared PDF (status ${response.status}).`);
-  }
-
-  return response.arrayBuffer();
 }
 
 function toBlob(canvas, imageQuality) {
@@ -318,12 +186,13 @@ function initializeFlipbook() {
   setControlsEnabled(true);
 }
 
-async function buildFlipbookFromPdfBytes(pdfBytes, sourceName) {
+async function buildFlipbookFromPdf(file) {
   resetFlipbook();
   setStatus("Reading PDF...");
   const qualityPreset = getSelectedQualityPreset();
 
-  const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
+  const fileData = await file.arrayBuffer();
+  const loadingTask = pdfjsLib.getDocument({ data: fileData });
   const pdf = await loadingTask.promise;
 
   pageCount = pdf.numPages;
@@ -393,10 +262,6 @@ async function buildFlipbookFromPdfBytes(pdfBytes, sourceName) {
     },
     { once: true }
   );
-
-  currentPdfBytes = pdfBytes.slice(0);
-  currentPdfName = sourceName || "document.pdf";
-  updateShareControls();
 }
 
 async function handlePdfFile(file) {
@@ -414,8 +279,7 @@ async function handlePdfFile(file) {
     statusEl.hidden = false;
     flipbookContainer.hidden = true;
     dropHint.hidden = true;
-    const fileBytes = await file.arrayBuffer();
-    await buildFlipbookFromPdfBytes(fileBytes, file.name);
+    await buildFlipbookFromPdf(file);
   } catch (error) {
     console.error(error);
     setStatus("Failed to parse this PDF. Try a different file.", true);
@@ -428,71 +292,6 @@ pdfInput.addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
   await handlePdfFile(file);
 });
-
-saveShareBtn.addEventListener("click", async () => {
-  if (!isXanoConfigured()) {
-    setStatus("Xano is not configured yet. Add API URLs in app.js.", true);
-    return;
-  }
-
-  if (!currentPdfBytes) {
-    setStatus("Load a PDF before creating a share link.", true);
-    return;
-  }
-
-  try {
-    saveShareBtn.disabled = true;
-    setStatus("Saving PDF to backend and creating share link...");
-    const shareUrl = await createShareRecordInXano(currentPdfBytes, currentPdfName, pageCount);
-    shareLinkOutput.value = shareUrl;
-    copyShareBtn.disabled = false;
-    setStatus("Share link created.");
-  } catch (error) {
-    console.error(error);
-    setStatus("Could not create share link. Check Xano table inputs and CORS.", true);
-  } finally {
-    updateShareControls();
-  }
-});
-
-copyShareBtn.addEventListener("click", async () => {
-  if (!shareLinkOutput.value) {
-    return;
-  }
-
-  try {
-    await navigator.clipboard.writeText(shareLinkOutput.value);
-    setStatus("Share link copied.");
-  } catch (error) {
-    console.error(error);
-    setStatus("Could not copy automatically. Copy from the text field.", true);
-  }
-});
-
-async function loadSharedBookFromUrlIfPresent() {
-  const params = new URLSearchParams(window.location.search);
-  const recordId = params.get("book");
-  if (!recordId) {
-    return;
-  }
-
-  if (!isXanoConfigured()) {
-    setStatus("Shared link detected, but Xano is not configured in app.js.", true);
-    return;
-  }
-
-  try {
-    dropHint.hidden = true;
-    setStatus("Loading shared document...");
-    const { fileUrl, filename } = await resolveSharedBookFromXano(recordId);
-    const pdfBytes = await fetchPdfBytesFromUrl(fileUrl);
-    await buildFlipbookFromPdfBytes(pdfBytes, filename);
-    setStatus("Shared flipbook loaded.");
-  } catch (error) {
-    console.error(error);
-    setStatus("Could not load this shared link.", true);
-  }
-}
 
 viewerWrap.addEventListener("dragenter", (event) => {
   event.preventDefault();
@@ -558,5 +357,3 @@ goToPageBtn.addEventListener("click", () => {
 
 setControlsEnabled(false);
 updateIndicator();
-updateShareControls();
-loadSharedBookFromUrlIfPresent();

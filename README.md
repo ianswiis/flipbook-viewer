@@ -18,7 +18,6 @@ No backend is required, and uploaded PDFs are not sent to a server.
 - Animated page-turn effect with StPageFlip.
 - Previous/Next navigation and direct page jump.
 - Quality mode selector: `Fast`, `Balanced`, `High`.
-- Optional Xano backend integration for share links.
 - Mobile-friendly responsive layout.
 
 ## Tech Stack
@@ -52,49 +51,6 @@ Then open the local URL in your browser.
 - `index.html` contains the upload control, navigation controls, and flipbook container.
 - `app.js` reads the selected PDF as an `ArrayBuffer`, renders pages with PDF.js, and initializes StPageFlip from generated page elements.
 - `styles.css` provides responsive UI styling and viewer layout.
-
-## Optional Backend Sharing With Xano
-
-The app now includes a **Create Share Link** workflow that can store PDFs on a backend and generate a URL another user can open.
-
-### 1) Configure Xano endpoints in `app.js`
-
-Update the `XANO_CONFIG` object:
-
-- `apiBaseUrl` (required)
-- `uploadPdfPath`
-- `createSharePath`
-- `resolveSharePath`
-- `apiKey` (optional, if your endpoint requires auth)
-
-### 2) Expected API behavior
-
-Upload endpoint (`POST`):
-
-- Receives multipart form-data with `file`
-- Returns JSON containing one of: `file_url`, `fileUrl`, `url`, `pdf_url`, `pdfUrl`
-
-Create share endpoint (`POST`):
-
-- Receives JSON: `file_url`, `filename`, `page_count`, `created_at`
-- Returns either:
-	- `share_url` / `shareUrl`, or
-	- token-like value in `share_token`, `shareToken`, `token`, or `id`
-
-Resolve share endpoint (`GET /{token}`):
-
-- Returns JSON with file URL and optional `filename`
-- File URL keys supported: `file_url`, `fileUrl`, `url`, `pdf_url`, `pdfUrl`
-
-### 3) Share URL format
-
-If your create endpoint returns a full URL, that URL is used directly.
-
-If it returns only a token, the app creates a URL like:
-
-`https://your-site.example/?book=TOKEN`
-
-When someone opens that link, the app resolves the token through Xano and opens the document automatically.
 
 ## Limitations
 
