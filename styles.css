@@ -22,7 +22,7 @@ body {
 }
 
 html {
-  overflow-y: auto;
+  overflow-y: scroll;
   scrollbar-gutter: stable;
 }
 
@@ -34,11 +34,6 @@ body {
     radial-gradient(circle at 14% 18%, rgba(255, 255, 255, 0.26) 0%, transparent 36%),
     radial-gradient(circle at 86% 24%, rgba(255, 255, 255, 0.2) 0%, transparent 40%),
     linear-gradient(145deg, #ef5d2f 0%, #f9ae42 100%);
-}
-
-html.flipbook-interacting,
-body.flipbook-interacting {
-  overflow: hidden;
 }
 
 .app-shell {
