@@ -24,6 +24,7 @@ let currentObjectUrls = [];
 let bookDimensions = { width: 900, height: 1200 };
 const BLANK_FRONT_PAGE_COUNT = 1;
 const BLANK_BACK_PAGE_COUNT = 1;
+const INTERACTIVE_FLIP_STATES = new Set(["user_fold", "fold_corner", "flipping"]);
 
 const DEFAULT_PAGE_WIDTH = 900;
 const DEFAULT_PAGE_HEIGHT = 1200;
@@ -45,6 +46,21 @@ function setControlsEnabled(enabled) {
   nextBtn.disabled = !enabled;
   goToPageBtn.disabled = !enabled;
   pageNumberInput.disabled = !enabled;
+}
+
+function setFlipInteractionLock(locked) {
+  document.documentElement.classList.toggle("flipbook-interacting", locked);
+  document.body.classList.toggle("flipbook-interacting", locked);
+}
+
+function beginPointerInteraction() {
+  setFlipInteractionLock(true);
+}
+
+function endPointerInteraction() {
+  if (!pageFlip || !INTERACTIVE_FLIP_STATES.has(pageFlip.getState())) {
+    setFlipInteractionLock(false);
+  }
 }
 
 function updateIndicator() {
@@ -93,6 +109,7 @@ function buildBlankBackPageNode() {
 function resetFlipbook() {
   currentObjectUrls.forEach((url) => URL.revokeObjectURL(url));
   currentObjectUrls = [];
+  setFlipInteractionLock(false);
 
   if (pageFlip) {
     pageFlip.destroy();
@@ -172,6 +189,7 @@ function initializeFlipbook() {
     usePortrait: true,
     startPage: 0,
     drawShadow: true,
+    showPageCorners: false,
   });
 
   pageFlip.loadFromHTML(document.querySelectorAll("#flipbook .page"));
@@ -179,6 +197,10 @@ function initializeFlipbook() {
   pageFlip.on("flip", (event) => {
     currentPage = event.data + 1;
     updateIndicator();
+  });
+
+  pageFlip.on("changeState", (event) => {
+    setFlipInteractionLock(INTERACTIVE_FLIP_STATES.has(event.data));
   });
 
   currentPage = 1;
@@ -328,6 +350,10 @@ viewerWrap.addEventListener("drop", async (event) => {
 
   await handlePdfFile(file);
 });
+
+flipbookEl.addEventListener("mousedown", beginPointerInteraction);
+window.addEventListener("mouseup", endPointerInteraction);
+flipbookEl.addEventListener("mouseleave", endPointerInteraction);
 
 prevBtn.addEventListener("click", () => {
   if (pageFlip) {
